@@ -1,4 +1,3 @@
-
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -8,25 +7,39 @@ const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-io.on("connection", (socket) => {
+io.on("connection", socket => {
+
   socket.on("join-room", ({ room, username }) => {
     socket.join(room);
-    socket.to(room).emit("system", `${username} joined the room`);
 
-    socket.on("chat-message", (msg) => {
-      io.to(room).emit("chat-message", msg);
+    socket.to(room).emit("system", {
+      text: `${username} joined the room`,
+      time: new Date().toLocaleTimeString()
+    });
+
+    socket.on("chat-message", msg => {
+      io.to(room).emit("chat-message", {
+        ...msg,
+        time: new Date().toLocaleTimeString()
+      });
+    });
+
+    socket.on("reaction", data => {
+      io.to(room).emit("reaction", data);
     });
 
     socket.on("disconnect", () => {
-      socket.to(room).emit("system", `${username} left the room`);
+      socket.to(room).emit("system", {
+        text: `${username} left the room`,
+        time: new Date().toLocaleTimeString()
+      });
     });
   });
+
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("Server running on", PORT));
+server.listen(process.env.PORT || 3000);
