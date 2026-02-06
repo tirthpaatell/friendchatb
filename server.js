@@ -11,32 +11,36 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
+const rooms = {};
+
 io.on("connection", socket => {
 
   socket.on("join-room", ({ room, username }) => {
     socket.join(room);
+    socket.room = room;
+    socket.username = username;
 
-    socket.to(room).emit("system", {
-      text: `${username} joined the room`,
-      time: new Date().toLocaleTimeString()
-    });
+    if (!rooms[room]) rooms[room] = [];
+    rooms[room].push(username);
+
+    io.to(room).emit("users", rooms[room]);
+    socket.to(room).emit("system", `${username} joined`);
 
     socket.on("chat-message", msg => {
-      io.to(room).emit("chat-message", {
-        ...msg,
-        time: new Date().toLocaleTimeString()
-      });
+      io.to(room).emit("chat-message", msg);
     });
 
-    socket.on("reaction", data => {
-      io.to(room).emit("reaction", data);
+    socket.on("typing", status => {
+      socket.to(room).emit("typing", {
+        user: username,
+        status
+      });
     });
 
     socket.on("disconnect", () => {
-      socket.to(room).emit("system", {
-        text: `${username} left the room`,
-        time: new Date().toLocaleTimeString()
-      });
+      rooms[room] = rooms[room].filter(u => u !== username);
+      io.to(room).emit("users", rooms[room]);
+      socket.to(room).emit("system", `${username} left`);
     });
   });
 
